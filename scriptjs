@@ -1,217 +1,100 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+// Game variables
+let canvas = document.getElementById('gameCanvas');
+let ctx = canvas.getContext('2d');
+let startButton = document.getElementById('startBtn');
+let timeDisplay = document.getElementById('timeDisplay');
+let moveCountDisplay = document.getElementById('moveCount');
+let gameInterval;
+let gameTime = 0;
+let moveCount = 0;
+let gameStarted = false;
 
-const startBtn = document.getElementById('startBtn');
-const timeDisplay = document.getElementById('timeDisplay');
-const moveCountDisplay = document.getElementById('moveCount');
+// Game settings
+canvas.width = 400;
+canvas.height = 400;
+let player = { x: 0, y: 0, size: 20, color: 'blue' };
+let goal = { x: 380, y: 380, size: 20, color: 'green' };
 
-let player, maze, timer, moveCount, gameStarted, gameTime, mazeSize = 10;
-let mazeSolved = false;
-let enemies = [];
-let powerUps = [];
-let currentLevel = 1;
+// Key listener for player movement
+let keys = {
+    ArrowUp: false,
+    ArrowDown: false,
+    ArrowLeft: false,
+    ArrowRight: false
+};
 
-startBtn.addEventListener('click', startGame);
+document.addEventListener('keydown', (event) => {
+    if (event.key in keys) {
+        keys[event.key] = true;
+    }
+});
 
+document.addEventListener('keyup', (event) => {
+    if (event.key in keys) {
+        keys[event.key] = false;
+    }
+});
+
+// Start game
+startButton.addEventListener('click', () => {
+    if (!gameStarted) {
+        startGame();
+    }
+});
+
+// Start the game
 function startGame() {
-    moveCount = 0;
-    mazeSolved = false;
     gameStarted = true;
+    startButton.disabled = true;
+    moveCount = 0;
     gameTime = 0;
     timeDisplay.textContent = gameTime;
     moveCountDisplay.textContent = moveCount;
-    
-    startBtn.disabled = true;
-    
-    canvas.width = 500;
-    canvas.height = 500;
+    player.x = 0;
+    player.y = 0;
+    gameInterval = setInterval(updateGame, 1000 / 60);  // 60 FPS
+    setInterval(() => { gameTime++; timeDisplay.textContent = gameTime; }, 1000);  // Update time every second
+}
+
+// Update game state
+function updateGame() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    player = {
-        x: 50,
-        y: 50,
-        size: 20,
-        color: 'blue',
-        speed: 20
-    };
-    
-    maze = generateMaze(mazeSize);
-
-    drawMaze();
+    movePlayer();
     drawPlayer();
-
-    // Generate enemies and power-ups for the current level
-    generateEnemies();
-    generatePowerUps();
-
-    timer = setInterval(updateGame, 1000);
-    
-    window.addEventListener('keydown', movePlayer);
+    drawGoal();
+    checkGoalReached();
 }
 
-function generateMaze(size) {
-    const mazeArray = Array(size).fill(null).map(() => Array(size).fill(0));
-    
-    for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
-            mazeArray[i][j] = Math.random() > 0.7 ? 1 : 0;
-        }
-    }
-
-    mazeArray[0][0] = 0;
-    mazeArray[size-1][size-1] = 0;
-
-    return mazeArray;
-}
-
-function generateEnemies() {
-    enemies = [];
-    for (let i = 0; i < currentLevel; i++) {
-        const x = Math.floor(Math.random() * mazeSize);
-        const y = Math.floor(Math.random() * mazeSize);
-        enemies.push({ x, y, direction: Math.random() > 0.5 ? 'horizontal' : 'vertical', speed: 1 });
-    }
-}
-
-function generatePowerUps() {
-    powerUps = [];
-    for (let i = 0; i < currentLevel; i++) {
-        const x = Math.floor(Math.random() * mazeSize);
-        const y = Math.floor(Math.random() * mazeSize);
-        powerUps.push({ x, y, type: Math.random() > 0.5 ? 'speed' : 'shield' });
-    }
-}
-
-function drawMaze() {
-    const cellSize = canvas.width / mazeSize;
-    
-    for (let i = 0; i < mazeSize; i++) {
-        for (let j = 0; j < mazeSize; j++) {
-            ctx.fillStyle = maze[i][j] === 1 ? 'black' : 'white';
-            ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
-            ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize);
-        }
-    }
-
-    // Draw power-ups
-    powerUps.forEach(powerUp => {
-        ctx.fillStyle = powerUp.type === 'speed' ? 'green' : 'yellow';
-        ctx.beginPath();
-        ctx.arc((powerUp.x + 0.5) * (canvas.width / mazeSize), (powerUp.y + 0.5) * (canvas.width / mazeSize), 10, 0, Math.PI * 2);
-        ctx.fill();
-    });
-
-    // Draw enemies
-    enemies.forEach(enemy => {
-        ctx.fillStyle = 'red';
-        ctx.beginPath();
-        ctx.arc((enemy.x + 0.5) * (canvas.width / mazeSize), (enemy.y + 0.5) * (canvas.width / mazeSize), 10, 0, Math.PI * 2);
-        ctx.fill();
-    });
-}
-
+// Draw the player on the canvas
 function drawPlayer() {
     ctx.fillStyle = player.color;
-    ctx.beginPath();
-    ctx.arc(player.x + player.size / 2, player.y + player.size / 2, player.size / 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(player.x, player.y, player.size, player.size);
 }
 
-function movePlayer(event) {
-    if (mazeSolved) return;
-
-    const cellSize = canvas.width / mazeSize;
-    const currentX = Math.floor(player.x / cellSize);
-    const currentY = Math.floor(player.y / cellSize);
-
-    switch(event.key) {
-        case 'ArrowUp':
-            if (currentY > 0 && maze[currentY - 1][currentX] === 0) player.y -= player.speed;
-            break;
-        case 'ArrowDown':
-            if (currentY < mazeSize - 1 && maze[currentY + 1][currentX] === 0) player.y += player.speed;
-            break;
-        case 'ArrowLeft':
-            if (currentX > 0 && maze[currentY][currentX - 1] === 0) player.x -= player.speed;
-            break;
-        case 'ArrowRight':
-            if (currentX < mazeSize - 1 && maze[currentY][currentX + 1] === 0) player.x += player.speed;
-            break;
-    }
-
-    // Check for power-up collection
-    powerUps.forEach((powerUp, index) => {
-        if (Math.abs(player.x - powerUp.x * (canvas.width / mazeSize)) < player.size && 
-            Math.abs(player.y - powerUp.y * (canvas.width / mazeSize)) < player.size) {
-            powerUps.splice(index, 1);
-            handlePowerUp(powerUp);
-        }
-    });
-
-    moveCount++;
-    moveCountDisplay.textContent = moveCount;
-    drawGame();
+// Draw the goal on the canvas
+function drawGoal() {
+    ctx.fillStyle = goal.color;
+    ctx.fillRect(goal.x, goal.y, goal.size, goal.size);
 }
 
-function handlePowerUp(powerUp) {
-    if (powerUp.type === 'speed') {
-        player.speed = 30; // Speed boost
-        setTimeout(() => {
-            player.speed = 20; // Reset speed after 5 seconds
-        }, 5000);
-    } else if (powerUp.type === 'shield') {
-        // Shield functionality: make player invincible for a short time
-        player.color = 'gold'; // Change color to indicate shield
-        setTimeout(() => {
-            player.color = 'blue'; // Reset color after shield expires
-        }, 5000);
+// Move the player based on key inputs
+function movePlayer() {
+    if (keys.ArrowUp && player.y > 0) player.y -= 5;
+    if (keys.ArrowDown && player.y < canvas.height - player.size) player.y += 5;
+    if (keys.ArrowLeft && player.x > 0) player.x -= 5;
+    if (keys.ArrowRight && player.x < canvas.width - player.size) player.x += 5;
+    if (keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight) {
+        moveCount++;
+        moveCountDisplay.textContent = moveCount;
     }
 }
 
-function updateGame() {
-    if (gameStarted) {
-        gameTime++;
-        timeDisplay.textContent = gameTime;
-
-        moveEnemies();
-        checkWinCondition();
+// Check if the player has reached the goal
+function checkGoalReached() {
+    if (player.x < goal.x + goal.size && player.x + player.size > goal.x && player.y < goal.y + goal.size && player.y + player.size > goal.y) {
+        clearInterval(gameInterval);
+        alert('Congratulations! You reached the goal!');
+        startButton.disabled = false;
+        gameStarted = false;
     }
-}
-
-function moveEnemies() {
-    enemies.forEach(enemy => {
-        if (enemy.direction === 'horizontal') {
-            enemy.x += enemy.speed;
-            if (enemy.x >= mazeSize - 1 || enemy.x <= 0) enemy.speed *= -1;
-        } else {
-            enemy.y += enemy.speed;
-            if (enemy.y >= mazeSize - 1 || enemy.y <= 0) enemy.speed *= -1;
-        }
-    });
-}
-
-function checkWinCondition() {
-    const cellSize = canvas.width / mazeSize;
-    const currentX = Math.floor(player.x / cellSize);
-    const currentY = Math.floor(player.y / cellSize);
-
-    if (currentX === mazeSize - 1 && currentY === mazeSize - 1) {
-        mazeSolved = true;
-        clearInterval(timer);
-        alert(`Level ${currentLevel} Complete! Time: ${gameTime}s, Moves: ${moveCount}`);
-        
-        if (currentLevel < 5) { // Increase level
-            currentLevel++;
-            startGame(); // Restart game with new level
-        } else {
-            alert('Congratulations! You completed all levels!');
-            startBtn.disabled = false;
-        }
-    }
-}
-
-function drawGame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawMaze();
-    drawPlayer();
 }
