@@ -125,4 +125,22 @@ function movePlayer(e) {
     if (e.key === 'ArrowRight' && player.x < gridWidth - 1) newX++;
 
     // Check if new position is blocked by obstacle
-    if 
+    if (obstacles.some(obstacle => obstacle.x === newX && obstacle.y === newY)) return;
+
+    player.x = newX;
+    player.y = newY;
+    moveCount++;
+
+    document.getElementById('moveCount').textContent = moveCount;
+
+    // Check if player reached the goal
+    if (player.x === goal.x && player.y === goal.y) {
+        clearInterval(gameInterval);  // Stop the timer
+        alert('You reached the goal!');
+        gameStarted = false;
+        document.getElementById('startBtn').disabled = false;  // Enable the start button again
+        document.getElementById('obstaclesToggle').disabled = false;  // Enable obstacle toggle
+    }
+
+    drawBoard();
+}
