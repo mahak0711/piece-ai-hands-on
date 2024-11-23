@@ -6,9 +6,10 @@ const timeDisplay = document.getElementById('timeDisplay');
 const moveCountDisplay = document.getElementById('moveCount');
 
 let player, maze, timer, moveCount, gameStarted, gameTime, mazeSize = 10;
-let movingObstacles = [], powerUps = [];
 let mazeSolved = false;
-let level = 1;
+let enemies = [];
+let powerUps = [];
+let currentLevel = 1;
 
 startBtn.addEventListener('click', startGame);
 
@@ -17,7 +18,6 @@ function startGame() {
     mazeSolved = false;
     gameStarted = true;
     gameTime = 0;
-    level = 1;
     timeDisplay.textContent = gameTime;
     moveCountDisplay.textContent = moveCount;
     
@@ -32,56 +32,54 @@ function startGame() {
         y: 50,
         size: 20,
         color: 'blue',
-        speed: 20,
-        shield: false
+        speed: 20
     };
+    
+    maze = generateMaze(mazeSize);
 
-    generateMaze(level);
     drawMaze();
     drawPlayer();
+
+    // Generate enemies and power-ups for the current level
+    generateEnemies();
+    generatePowerUps();
 
     timer = setInterval(updateGame, 1000);
     
     window.addEventListener('keydown', movePlayer);
 }
 
-function generateMaze(level) {
-    mazeSize = 10 + level;  // Increase maze size with level
-    maze = Array(mazeSize).fill(null).map(() => Array(mazeSize).fill(0));
+function generateMaze(size) {
+    const mazeArray = Array(size).fill(null).map(() => Array(size).fill(0));
     
-    // Add moving obstacles
-    movingObstacles = [];
-    for (let i = 0; i < level; i++) {
-        movingObstacles.push({
-            x: Math.floor(Math.random() * mazeSize),
-            y: Math.floor(Math.random() * mazeSize),
-            direction: Math.random() > 0.5 ? 1 : -1,
-            size: 20,
-            color: 'red'
-        });
-    }
-    
-    // Add power-ups
-    powerUps = [];
-    for (let i = 0; i < level; i++) {
-        powerUps.push({
-            x: Math.floor(Math.random() * mazeSize),
-            y: Math.floor(Math.random() * mazeSize),
-            size: 15,
-            type: Math.random() > 0.5 ? 'speed' : 'shield',
-            color: 'green'
-        });
-    }
-
-    // Generate walls
-    for (let i = 0; i < mazeSize; i++) {
-        for (let j = 0; j < mazeSize; j++) {
-            maze[i][j] = Math.random() > 0.7 ? 1 : 0;
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            mazeArray[i][j] = Math.random() > 0.7 ? 1 : 0;
         }
     }
 
-    maze[0][0] = 0;
-    maze[mazeSize-1][mazeSize-1] = 0;
+    mazeArray[0][0] = 0;
+    mazeArray[size-1][size-1] = 0;
+
+    return mazeArray;
+}
+
+function generateEnemies() {
+    enemies = [];
+    for (let i = 0; i < currentLevel; i++) {
+        const x = Math.floor(Math.random() * mazeSize);
+        const y = Math.floor(Math.random() * mazeSize);
+        enemies.push({ x, y, direction: Math.random() > 0.5 ? 'horizontal' : 'vertical', speed: 1 });
+    }
+}
+
+function generatePowerUps() {
+    powerUps = [];
+    for (let i = 0; i < currentLevel; i++) {
+        const x = Math.floor(Math.random() * mazeSize);
+        const y = Math.floor(Math.random() * mazeSize);
+        powerUps.push({ x, y, type: Math.random() > 0.5 ? 'speed' : 'shield' });
+    }
 }
 
 function drawMaze() {
@@ -95,17 +93,19 @@ function drawMaze() {
         }
     }
 
-    // Draw moving obstacles
-    movingObstacles.forEach(obstacle => {
-        ctx.fillStyle = obstacle.color;
-        ctx.fillRect(obstacle.x * cellSize, obstacle.y * cellSize, obstacle.size, obstacle.size);
-    });
-
     // Draw power-ups
     powerUps.forEach(powerUp => {
-        ctx.fillStyle = powerUp.color;
+        ctx.fillStyle = powerUp.type === 'speed' ? 'green' : 'yellow';
         ctx.beginPath();
-        ctx.arc(powerUp.x * cellSize + cellSize / 2, powerUp.y * cellSize + cellSize / 2, powerUp.size, 0, Math.PI * 2);
+        ctx.arc((powerUp.x + 0.5) * (canvas.width / mazeSize), (powerUp.y + 0.5) * (canvas.width / mazeSize), 10, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Draw enemies
+    enemies.forEach(enemy => {
+        ctx.fillStyle = 'red';
+        ctx.beginPath();
+        ctx.arc((enemy.x + 0.5) * (canvas.width / mazeSize), (enemy.y + 0.5) * (canvas.width / mazeSize), 10, 0, Math.PI * 2);
         ctx.fill();
     });
 }
@@ -140,28 +140,32 @@ function movePlayer(event) {
     }
 
     // Check for power-up collection
-    checkPowerUps(currentX, currentY);
+    powerUps.forEach((powerUp, index) => {
+        if (Math.abs(player.x - powerUp.x * (canvas.width / mazeSize)) < player.size && 
+            Math.abs(player.y - powerUp.y * (canvas.width / mazeSize)) < player.size) {
+            powerUps.splice(index, 1);
+            handlePowerUp(powerUp);
+        }
+    });
 
     moveCount++;
     moveCountDisplay.textContent = moveCount;
     drawGame();
 }
 
-function checkPowerUps(currentX, currentY) {
-    const cellSize = canvas.width / mazeSize;
-    powerUps.forEach((powerUp, index) => {
-        if (currentX === powerUp.x && currentY === powerUp.y) {
-            // Apply power-up
-            if (powerUp.type === 'speed') {
-                player.speed += 10;
-                playSound('speed');
-            } else if (powerUp.type === 'shield') {
-                player.shield = true;
-                playSound('shield');
-            }
-            powerUps.splice(index, 1);
-        }
-    });
+function handlePowerUp(powerUp) {
+    if (powerUp.type === 'speed') {
+        player.speed = 30; // Speed boost
+        setTimeout(() => {
+            player.speed = 20; // Reset speed after 5 seconds
+        }, 5000);
+    } else if (powerUp.type === 'shield') {
+        // Shield functionality: make player invincible for a short time
+        player.color = 'gold'; // Change color to indicate shield
+        setTimeout(() => {
+            player.color = 'blue'; // Reset color after shield expires
+        }, 5000);
+    }
 }
 
 function updateGame() {
@@ -169,17 +173,21 @@ function updateGame() {
         gameTime++;
         timeDisplay.textContent = gameTime;
 
-        // Move obstacles
-        movingObstacles.forEach(obstacle => {
-            obstacle.x += obstacle.direction;
-            if (obstacle.x >= mazeSize || obstacle.x < 0) {
-                obstacle.direction *= -1; // Change direction when hitting wall
-            }
-        });
-
-        // Check win condition
+        moveEnemies();
         checkWinCondition();
     }
+}
+
+function moveEnemies() {
+    enemies.forEach(enemy => {
+        if (enemy.direction === 'horizontal') {
+            enemy.x += enemy.speed;
+            if (enemy.x >= mazeSize - 1 || enemy.x <= 0) enemy.speed *= -1;
+        } else {
+            enemy.y += enemy.speed;
+            if (enemy.y >= mazeSize - 1 || enemy.y <= 0) enemy.speed *= -1;
+        }
+    });
 }
 
 function checkWinCondition() {
@@ -187,4 +195,23 @@ function checkWinCondition() {
     const currentX = Math.floor(player.x / cellSize);
     const currentY = Math.floor(player.y / cellSize);
 
-    if (currentX ===
+    if (currentX === mazeSize - 1 && currentY === mazeSize - 1) {
+        mazeSolved = true;
+        clearInterval(timer);
+        alert(`Level ${currentLevel} Complete! Time: ${gameTime}s, Moves: ${moveCount}`);
+        
+        if (currentLevel < 5) { // Increase level
+            currentLevel++;
+            startGame(); // Restart game with new level
+        } else {
+            alert('Congratulations! You completed all levels!');
+            startBtn.disabled = false;
+        }
+    }
+}
+
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawMaze();
+    drawPlayer();
+}
