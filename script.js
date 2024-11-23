@@ -1,136 +1,132 @@
-// Get canvas and context
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Game variables
-const tileSize = 40;  // size of each tile
-const gridWidth = 10; // Grid width (number of tiles)
-const gridHeight = 10; // Grid height (number of tiles)
-let player = { x: 0, y: 0, color: 'blue' };  // Player initial position and color
-let goal = { x: 9, y: 9, color: 'green' };  // Goal initial position and color
-let obstacles = [];  // Array to hold obstacle positions
-let moveCount = 0;  // Track number of moves
-let gameInterval;  // To store game time interval
+const startBtn = document.getElementById('startBtn');
+const timeDisplay = document.getElementById('timeDisplay');
+const moveCountDisplay = document.getElementById('moveCount');
 
-// Grid Setup: Adjust the canvas size according to the grid
-canvas.width = gridWidth * tileSize;
-canvas.height = gridHeight * tileSize;
+let player, maze, timer, moveCount, gameStarted, gameTime, mazeSize = 10;
+let mazeSolved = false;
 
-// Generate random obstacles on the grid
-function generateObstacles() {
-    obstacles = [];
-    let numberOfObstacles = 15;  // Adjust the number of obstacles here
+startBtn.addEventListener('click', startGame);
 
-    // Ensure the player and goal aren't on the same tile as an obstacle
-    while (obstacles.length < numberOfObstacles) {
-        let x = Math.floor(Math.random() * gridWidth);
-        let y = Math.floor(Math.random() * gridHeight);
-
-        // Avoid placing obstacles where the player or goal is
-        if ((x !== player.x || y !== player.y) && (x !== goal.x || y !== goal.y)) {
-            obstacles.push({ x, y });
-        }
-    }
-}
-
-// Draw the grid (background, player, goal, obstacles)
-function draw() {
-    // Clear the canvas
+function startGame() {
+    moveCount = 0;
+    mazeSolved = false;
+    gameStarted = true;
+    gameTime = 0;
+    timeDisplay.textContent = gameTime;
+    moveCountDisplay.textContent = moveCount;
+    
+    startBtn.disabled = true;
+    
+    canvas.width = 500;
+    canvas.height = 500;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw the grid lines
-    ctx.strokeStyle = "#ccc";
-    for (let x = 0; x < gridWidth; x++) {
-        for (let y = 0; y < gridHeight; y++) {
-            ctx.strokeRect(x * tileSize, y * tileSize, tileSize, tileSize);
+    player = {
+        x: 50,
+        y: 50,
+        size: 20,
+        color: 'blue',
+        speed: 20
+    };
+    
+    maze = generateMaze(mazeSize);
+
+    drawMaze();
+    drawPlayer();
+
+    timer = setInterval(updateGame, 1000);
+    
+    window.addEventListener('keydown', movePlayer);
+}
+
+function generateMaze(size) {
+    const mazeArray = Array(size).fill(null).map(() => Array(size).fill(0));
+    
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            mazeArray[i][j] = Math.random() > 0.7 ? 1 : 0;
         }
     }
 
-    // Draw obstacles
-    ctx.fillStyle = 'black';
-    obstacles.forEach(obstacle => {
-        ctx.fillRect(obstacle.x * tileSize, obstacle.y * tileSize, tileSize, tileSize);
-    });
+    mazeArray[0][0] = 0;
+    mazeArray[size-1][size-1] = 0;
 
-    // Draw the goal
-    ctx.fillStyle = goal.color;
-    ctx.fillRect(goal.x * tileSize, goal.y * tileSize, tileSize, tileSize);
+    return mazeArray;
+}
 
-    // Draw the player
+function drawMaze() {
+    const cellSize = canvas.width / mazeSize;
+    
+    for (let i = 0; i < mazeSize; i++) {
+        for (let j = 0; j < mazeSize; j++) {
+            ctx.fillStyle = maze[i][j] === 1 ? 'black' : 'white';
+            ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
+            ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize);
+        }
+    }
+}
+
+function drawPlayer() {
     ctx.fillStyle = player.color;
-    ctx.fillRect(player.x * tileSize, player.y * tileSize, tileSize, tileSize);
+    ctx.beginPath();
+    ctx.arc(player.x + player.size / 2, player.y + player.size / 2, player.size / 2, 0, Math.PI * 2);
+    ctx.fill();
 }
 
-// Move player
-function movePlayer(direction) {
-    let newX = player.x;
-    let newY = player.y;
+function movePlayer(event) {
+    if (mazeSolved) return;
 
-    // Update player position based on direction
-    if (direction === 'up') {
-        newY--;
-    } else if (direction === 'down') {
-        newY++;
-    } else if (direction === 'left') {
-        newX--;
-    } else if (direction === 'right') {
-        newX++;
+    const cellSize = canvas.width / mazeSize;
+    const currentX = Math.floor(player.x / cellSize);
+    const currentY = Math.floor(player.y / cellSize);
+
+    switch(event.key) {
+        case 'ArrowUp':
+            if (currentY > 0 && maze[currentY - 1][currentX] === 0) player.y -= player.speed;
+            break;
+        case 'ArrowDown':
+            if (currentY < mazeSize - 1 && maze[currentY + 1][currentX] === 0) player.y += player.speed;
+            break;
+        case 'ArrowLeft':
+            if (currentX > 0 && maze[currentY][currentX - 1] === 0) player.x -= player.speed;
+            break;
+        case 'ArrowRight':
+            if (currentX < mazeSize - 1 && maze[currentY][currentX + 1] === 0) player.x += player.speed;
+            break;
     }
 
-    // Check if the new position is within bounds and not on an obstacle
-    if (newX >= 0 && newX < gridWidth && newY >= 0 && newY < gridHeight) {
-        // Check if it's an obstacle
-        if (!obstacles.some(obstacle => obstacle.x === newX && obstacle.y === newY)) {
-            player.x = newX;
-            player.y = newY;
-            moveCount++;
-        }
-    }
-    draw();
-    checkGameStatus();
+    moveCount++;
+    moveCountDisplay.textContent = moveCount;
+    drawGame();
 }
 
-// Check if the player reached the goal
-function checkGameStatus() {
-    if (player.x === goal.x && player.y === goal.y) {
-        alert(`You win! Total Moves: ${moveCount}`);
-        clearInterval(gameInterval); // Stop the timer
+function updateGame() {
+    if (gameStarted) {
+        gameTime++;
+        timeDisplay.textContent = gameTime;
+
+        checkWinCondition();
     }
 }
 
-// Start a new game
-function startGame() {
-    player = { x: 0, y: 0, color: 'blue' };  // Reset player position
-    goal = { x: 9, y: 9, color: 'green' };  // Reset goal position
-    obstacles = [];
-    moveCount = 0;  // Reset move count
-    generateObstacles();  // Generate obstacles
-    draw();  // Draw initial state of the game
+function checkWinCondition() {
+    const cellSize = canvas.width / mazeSize;
+    const currentX = Math.floor(player.x / cellSize);
+    const currentY = Math.floor(player.y / cellSize);
 
-    // Start the timer
-    let time = 0;
-    gameInterval = setInterval(() => {
-        time++;
-        document.getElementById('timeDisplay').textContent = time;
-    }, 1000);
+    if (currentX === mazeSize - 1 && currentY === mazeSize - 1) {
+        mazeSolved = true;
+        clearInterval(timer);
+        alert(`You Win! Time: ${gameTime}s, Moves: ${moveCount}`);
+        startBtn.disabled = false;
+    }
 }
 
-// Add event listeners for keyboard controls
-document.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowUp') {
-        movePlayer('up');
-    } else if (event.key === 'ArrowDown') {
-        movePlayer('down');
-    } else if (event.key === 'ArrowLeft') {
-        movePlayer('left');
-    } else if (event.key === 'ArrowRight') {
-        movePlayer('right');
-    }
-});
-
-// Initialize the game
-document.getElementById('startBtn').addEventListener('click', startGame);
-
-// Initial game setup
-generateObstacles();
-draw();
+function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawMaze();
+    drawPlayer();
+}
