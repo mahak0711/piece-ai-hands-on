@@ -8,12 +8,19 @@
 </head>
 <body>
     <div id="game-container">
+        <!-- Canvas for maze and player -->
         <canvas id="gameCanvas"></canvas>
+        
+        <!-- Stats display -->
         <div id="stats">
             <p>Steps: <span id="steps">0</span></p>
         </div>
+
+        <!-- Game Over message -->
         <div id="game-over">Game Over! You reached the exit!</div>
-        <button id="restart-btn">Restart</button>
+
+        <!-- Restart Button -->
+        <button id="restart-btn" style="display: none;">Restart</button>
     </div>
 
     <!-- Instructions Overlay -->
