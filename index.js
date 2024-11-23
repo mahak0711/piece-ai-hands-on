@@ -187,10 +187,4 @@ function checkWinCondition() {
     const currentX = Math.floor(player.x / cellSize);
     const currentY = Math.floor(player.y / cellSize);
 
-    if (currentX === mazeSize - 1 && currentY === mazeSize - 1) {
-        mazeSolved = true;
-        clearInterval(timer);
-        startBtn.disabled = false;
-        alert("Congratulations, you've completed the maze!");
-    }
-}
+    if (currentX ===
