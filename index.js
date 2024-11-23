@@ -115,3 +115,4 @@ startGameButton.addEventListener('click', function() {
 });
 
 restartButton.addEventListener('click', restartGame);
+
